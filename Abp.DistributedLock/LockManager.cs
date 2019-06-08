@@ -3,14 +3,33 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Abp.Dependency;
+using Abp.Locking.Internal;
 using Nito.AsyncEx;
 
 namespace Abp.Locking
 {
     public class LockManager : ILockManager, ISingletonDependency
     {
-        ConcurrentDictionary<string, AsyncLock> _locksStorage = new ConcurrentDictionary<string, AsyncLock>();
+        private readonly ReaderWriterLockSlim _storageLock = new ReaderWriterLockSlim();
+        private readonly ConcurrentDictionary<string, LockManagerDictionaryItem> _locksStorage = new ConcurrentDictionary<string, LockManagerDictionaryItem>();
         public LockManager() { }
+
+        public bool CheckLockSet(string key)
+        {
+            using (_storageLock.Read())
+            {
+                if (!_locksStorage.TryGetValue(key, out var dictItem))
+                    return false;
+                else
+                    return dictItem.Counter > 0;
+            }
+        }
+
+        public Task<bool> CheckLockSetAsync(string key)
+        {
+            bool result = CheckLockSet(key);
+            return Task.FromResult(result);
+        }
 
         public void PerformInLock(string key, Action actionTodo)
         {
@@ -45,17 +64,27 @@ namespace Abp.Locking
             if (actionTodo == null)
                 throw new ArgumentNullException(nameof(actionTodo));
 
-            var _lock = _locksStorage.GetOrAdd(key, (keyStr) => new AsyncLock());
+            LockManagerDictionaryItem _item;
+            using (_storageLock.Write())
+            {
+                _item = _locksStorage.GetOrAdd(key, (keyStr) => new LockManagerDictionaryItem { Lock = new AsyncLock(), Counter = 0 });
+                _item.Counter++;
+            }
             try
             {
-                using (var locking = _lock.Lock(cancellationToken))
+                using (var locking = _item.Lock.Lock(cancellationToken))
                 {
                     actionTodo();
                 }
             }
             finally
             {
-                _locksStorage.TryRemove(key, out _);
+                using (_storageLock.Write())
+                {
+                    _item.Counter--;
+                    if (_item.Counter == 0)
+                        _locksStorage.TryRemove(key, out _);
+                }
             }
         }
 
@@ -92,17 +121,27 @@ namespace Abp.Locking
             if (actionTodo == null)
                 throw new ArgumentNullException(nameof(actionTodo));
 
-            var _lock = _locksStorage.GetOrAdd(key, (keyStr) => new AsyncLock());
+            LockManagerDictionaryItem _item;
+            using (_storageLock.Write())
+            {
+                _item = _locksStorage.GetOrAdd(key, (keyStr) => new LockManagerDictionaryItem { Lock = new AsyncLock(), Counter = 0 });
+                _item.Counter++;
+            }
             try
             {
-                using (var locking = _lock.Lock(cancellationToken))
+                using (var locking = _item.Lock.Lock(cancellationToken))
                 {
                     return actionTodo();
                 }
             }
             finally
             {
-                _locksStorage.TryRemove(key, out _);
+                using (_storageLock.Write())
+                {
+                    _item.Counter--;
+                    if (_item.Counter == 0)
+                        _locksStorage.TryRemove(key, out _);
+                }
             }
         }
 
@@ -139,17 +178,27 @@ namespace Abp.Locking
             if (actionTodo == null)
                 throw new ArgumentNullException(nameof(actionTodo));
 
-            var _lock = _locksStorage.GetOrAdd(key, (keyStr) => new AsyncLock());
+            LockManagerDictionaryItem _item;
+            using (_storageLock.Write())
+            {
+                _item = _locksStorage.GetOrAdd(key, (keyStr) => new LockManagerDictionaryItem { Lock = new AsyncLock(), Counter = 0 });
+                _item.Counter++;
+            }
             try
             {
-                using (var locking = await _lock.LockAsync(cancellationToken))
+                using (var locking = await _item.Lock.LockAsync(cancellationToken))
                 {
                     await actionTodo();
                 }
             }
             finally
             {
-                _locksStorage.TryRemove(key, out _);
+                using (_storageLock.Write())
+                {
+                    _item.Counter--;
+                    if (_item.Counter == 0)
+                        _locksStorage.TryRemove(key, out _);
+                }
             }
         }
 
@@ -187,17 +236,27 @@ namespace Abp.Locking
             if (actionTodo == null)
                 throw new ArgumentNullException(nameof(actionTodo));
 
-            var _lock = _locksStorage.GetOrAdd(key, (keyStr) => new AsyncLock());
+            LockManagerDictionaryItem _item;
+            using (_storageLock.Write())
+            {
+                _item = _locksStorage.GetOrAdd(key, (keyStr) => new LockManagerDictionaryItem { Lock = new AsyncLock(), Counter = 0 });
+                _item.Counter++;
+            }
             try
             {
-                using (var locking = await _lock.LockAsync(cancellationToken))
+                using (var locking = await _item.Lock.LockAsync(cancellationToken))
                 {
                     return await actionTodo();
                 }
             }
             finally
             {
-                _locksStorage.TryRemove(key, out _);
+                using (_storageLock.Write())
+                {
+                    _item.Counter--;
+                    if (_item.Counter == 0)
+                        _locksStorage.TryRemove(key, out _);
+                }
             }
         }
     }

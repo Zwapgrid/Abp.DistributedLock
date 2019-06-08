@@ -4,9 +4,12 @@ using System.Threading.Tasks;
 
 namespace Abp.Locking
 {
+    // TODO add unit tests
     // TODO add documentation
     public interface ILockManager
     {
+        bool CheckLockSet(string key);
+        Task<bool> CheckLockSetAsync(string key);
         void PerformInLock(string key, Action actionTodo);
         void PerformInLock(string key, Action actionTodo, TimeSpan? expireIn = null);
         void PerformInLock(string key, Action actionTodo, CancellationToken cancellationToken = default);

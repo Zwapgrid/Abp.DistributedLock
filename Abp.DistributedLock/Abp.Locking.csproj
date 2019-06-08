@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp2.2</TargetFramework>
+    <Authors>Anton Shyrokykh</Authors>
+    <Company>Zwapgrid</Company>
+    <Description>Abp based implementation of distributed application lock (with included in-memory implementation by default)</Description>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
