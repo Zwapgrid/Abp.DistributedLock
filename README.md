@@ -1,2 +1,2 @@
-# Abp.DistributedLock
-Abp based implementation of distributed application lock (with included in-memory implementation by default)
+# Abp.Locking
+Abp-based implementation of application lock (with included in-memory implementation by default)
